@@ -14,7 +14,7 @@ kafka-topics --list --bootstrap-server broker:29092 <br>
 generate_data.py <br>
 1. Connect with Postgres DB 
 2. Creating Tables: voter, votes, candidate
-3. Generating the data into our system using Ramdom API
+3. Generating the data into our system using Ramdom API for all three tables.
 
 Resources: <br>
 1. https://www.youtube.com/watch?v=X-JnC9daQxE
