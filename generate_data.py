@@ -10,11 +10,6 @@ STATE = ["California", "Texas", "New York", "Florida"]
 
 random.seed(21)
 
-class Connection:
-    def __init__(self, host, dbname, user, password):
-        self.conn = psycopg2.connect(f"host={host} dbname={dbname} user={user} password={password}")
-        self.cur = self.conn.cursor()
-
 def delivery_report(err, msg):
     if err is not None:
         print(f"Message delivered unsuccessfully : {err}")
@@ -28,7 +23,8 @@ def create_tables(conn, cur):
             candidate_name VARCHAR(255),
             party VARCHAR(255),
             bio TEXT,
-            photo_url TEXT
+            photo_url TEXT,
+            state VARCHAR(255)
         )
     """)
 
@@ -74,12 +70,13 @@ def generate_candidate(candidate_number, total_parties):
             'candidate_name': f'{user_data['name']['first']} {user_data['name']['last']}',
             'party': PARTIES[candidate_number % total_parties],
             'bio': f'A prestige member of {PARTIES[candidate_number % total_parties]}',
-            'photo_url': user_data['picture']['large']
+            'photo_url': user_data['picture']['large'],
+            'state': STATE[candidate_number % 4],
         }
     else:
         return "Error fetching data from API"
     
-def generate_voter_data(voter_number):
+def generate_voter_data():
     response = requests.get(BASE_URL)
     if response.status_code == 200:
         user_data = response.json()['results'][0]
@@ -93,7 +90,7 @@ def generate_voter_data(voter_number):
             "address": {
                 "street": f"{user_data['location']['street']['number']} {user_data['location']['street']['name']}",
                 "city": user_data['location']['city'],
-                "state": STATE[voter_number % 4],
+                "state": STATE[random.randint(0, 3)],
                 "country": user_data['location']['country'],
                 "postcode": user_data['location']['postcode']
             },
@@ -108,8 +105,8 @@ if __name__ == "__main__":
     producer = SerializingProducer({'bootstrap.servers': 'localhost:9092'})
 
     try:
-        postgres_conn = Connection("localhost", "voting", "postgres", "postgres")
-        conn, cur = postgres_conn.conn, postgres_conn.cur
+        conn = psycopg2.connect(f"host=localhost dbname=voting user=postgres password=postgres")
+        cur = conn.cursor()
         create_tables(conn, cur)
 
         cur.execute(""" SELECT * FROM candidates""")
@@ -121,18 +118,18 @@ if __name__ == "__main__":
 
                 cur.execute(
                     """
-                    INSERT INTO candidates(candidate_id, candidate_name, party, bio, photo_url)
-                    VALUES(%s, %s, %s, %s, %s)
+                    INSERT INTO candidates(candidate_id, candidate_name, party, bio, photo_url, state)
+                    VALUES(%s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        candidate['candidate_id'], candidate['candidate_name'], candidate['party'], candidate['bio'], candidate['photo_url']
+                        candidate['candidate_id'], candidate['candidate_name'], candidate['party'], candidate['bio'], candidate['photo_url'], candidate['state']
                     )
                 )
 
                 conn.commit()
 
         for i in range(1000):
-            voter_data = generate_voter_data(i)
+            voter_data = generate_voter_data()
             print(voter_data)
             
             cur.execute(
